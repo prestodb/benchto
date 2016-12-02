@@ -41,6 +41,14 @@ var BenchmarkRunsHelper = function (benchmarkRuns, tags) {
         )));
     };
 
+    this.variableKeys = function () {
+        return _.uniq(_.flatten(_.map(this.benchmarkRuns,
+            function (benchmarkRun) {
+                return _.allKeys(benchmarkRun.variables);
+            }
+        )));
+    }
+
     this.aggregatedExecutionsMeasurementUnit = function (measurementKey) {
         for (var i = 0; i < this.benchmarkRuns.length; ++i) {
             var aggregatedMeasurement = this.benchmarkRuns[i].aggregatedMeasurements[measurementKey];
