@@ -42,6 +42,7 @@ import org.springframework.web.client.RestTemplate;
 import java.io.IOException;
 
 import static com.google.common.base.Preconditions.checkState;
+import static java.util.concurrent.TimeUnit.SECONDS;
 
 @Configuration
 @EnableRetry
@@ -74,6 +75,7 @@ public class DriverApp
 
         try {
             executionDriver.execute();
+            SECONDS.sleep(10); // Give time for TaskExecutor to run callbacks
             System.exit(0);
         }
         catch (Throwable e) {
