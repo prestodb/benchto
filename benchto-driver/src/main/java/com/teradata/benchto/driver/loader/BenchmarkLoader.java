@@ -57,11 +57,9 @@ import static com.teradata.benchto.driver.loader.BenchmarkDescriptor.VARIABLES_K
 import static com.teradata.benchto.driver.service.BenchmarkServiceClient.GenerateUniqueNamesRequestItem.generateUniqueNamesRequestItem;
 import static com.teradata.benchto.driver.utils.CartesianProductUtils.cartesianProduct;
 import static com.teradata.benchto.driver.utils.FilterUtils.pathContainsAny;
-import static com.teradata.benchto.driver.utils.YamlUtils.loadYamlFromString;
+import static com.teradata.benchto.driver.utils.YamlUtils.loadBenchmarkYamlFromFile;
 import static java.lang.String.format;
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.nio.file.Files.isRegularFile;
-import static java.nio.file.Files.readAllBytes;
 import static java.util.UUID.randomUUID;
 import static java.util.stream.Collectors.toList;
 import static org.apache.commons.io.FilenameUtils.removeExtension;
@@ -165,8 +163,7 @@ public class BenchmarkLoader
     private List<Benchmark> loadBenchmarks(String sequenceId, Path benchmarkFile)
     {
         try {
-            String content = new String(readAllBytes(benchmarkFile), UTF_8);
-            Map<String, Object> yaml = loadYamlFromString(content);
+            Map<String, Object> yaml = loadBenchmarkYamlFromFile(benchmarkFile);
 
             checkArgument(yaml.containsKey(DATA_SOURCE_KEY), "Mandatory variable %s not present in file %s", DATA_SOURCE_KEY, benchmarkFile);
             checkArgument(yaml.containsKey(QUERY_NAMES_KEY), "Mandatory variable %s not present in file %s", QUERY_NAMES_KEY, benchmarkFile);
