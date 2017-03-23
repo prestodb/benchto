@@ -14,6 +14,7 @@
 package com.teradata.benchto.driver.loader;
 
 import com.facebook.presto.jdbc.internal.guava.collect.ImmutableList;
+import com.google.common.io.ByteSource;
 import com.teradata.benchto.driver.Benchmark;
 import com.teradata.benchto.driver.Benchmark.BenchmarkBuilder;
 import com.teradata.benchto.driver.BenchmarkExecutionException;
@@ -29,23 +30,26 @@ import freemarker.template.TemplateException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.FileSystemResourceLoader;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
+import org.springframework.core.io.support.ResourcePatternResolver;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.io.InputStream;
 import java.time.Duration;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Optional;
 import java.util.Set;
-import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
+import static com.facebook.presto.jdbc.internal.guava.base.Preconditions.checkNotNull;
 import static com.facebook.presto.jdbc.internal.guava.base.Preconditions.checkState;
 import static com.facebook.presto.jdbc.internal.guava.collect.Lists.newArrayListWithCapacity;
 import static com.facebook.presto.jdbc.internal.guava.collect.Sets.newLinkedHashSet;
@@ -59,8 +63,7 @@ import static com.teradata.benchto.driver.utils.CartesianProductUtils.cartesianP
 import static com.teradata.benchto.driver.utils.YamlUtils.loadYamlFromString;
 import static java.lang.String.format;
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static java.nio.file.Files.isRegularFile;
-import static java.nio.file.Files.readAllBytes;
+import static java.util.Collections.singletonList;
 import static java.util.UUID.randomUUID;
 import static java.util.stream.Collectors.toList;
 import static org.apache.commons.io.FilenameUtils.removeExtension;
@@ -94,16 +97,11 @@ public class BenchmarkLoader
     public List<Benchmark> loadBenchmarks(String sequenceId)
     {
         try {
-            List<Path> benchmarkFiles = findBenchmarkFiles();
+            ResourcePatternResolver patternResolver = getResourcePatternResolver();
 
-            benchmarkFiles = benchmarkFiles.stream()
-                    .filter(activeBenchmarks())
-                    .collect(toList());
+            List<Resource> benchmarkFiles = findBenchmarkFiles(patternResolver);
 
-            benchmarkFiles.stream()
-                    .forEach(path -> LOGGER.info("Benchmark file to be read: {}", path));
-
-            List<Benchmark> allBenchmarks = loadBenchmarks(sequenceId, benchmarkFiles);
+            List<Benchmark> allBenchmarks = loadBenchmarks(sequenceId, patternResolver, benchmarkFiles);
             LOGGER.debug("All benchmarks: {}", allBenchmarks);
 
             List<Benchmark> includedBenchmarks = allBenchmarks.stream()
@@ -139,32 +137,65 @@ public class BenchmarkLoader
         }
     }
 
-    private List<Path> findBenchmarkFiles()
+    private List<Resource> findBenchmarkFiles(ResourcePatternResolver patternResolver)
             throws IOException
     {
-        LOGGER.info("Searching for benchmarks in classpath ...");
+        String benchmarksDir = properties.getBenchmarksDir();
+        List<String> activeBenchmarkPatterns = activeBenchmarkPatterns();
 
-        List<Path> benchmarkFiles = Files
-                .walk(properties.benchmarksFilesPath())
-                .filter(file -> isRegularFile(file) && file.toString().endsWith(BENCHMARK_FILE_SUFFIX))
+        LOGGER.info("Searching for {} benchmarks in  {} ...", activeBenchmarkPatterns, benchmarksDir);
+
+        List<Resource> benchmarkFiles = activeBenchmarkPatterns.stream()
+                .flatMap(pattern -> getResources(patternResolver, benchmarksDir + "/" + pattern))
+                .peek(resource -> LOGGER.info("Benchmark found: {}", resource))
                 .collect(toList());
-        benchmarkFiles.stream().forEach((path) -> LOGGER.info("Benchmark found: {}", path.toString()));
 
         return benchmarkFiles;
     }
 
-    private List<Benchmark> loadBenchmarks(String sequenceId, List<Path> benchmarkFiles)
+    private ResourcePatternResolver getResourcePatternResolver()
+    {
+        FileSystemResourceLoader resourceLoader = new FileSystemResourceLoader()
+        {
+            @Override
+            protected Resource getResourceByPath(String path)
+            {
+                if (path != null && path.startsWith("/")) {
+                    // Workaround superclass's stripping of leading '/'. Shameful.
+                    path = "/" + path;
+                }
+                return super.getResourceByPath(path);
+            }
+        };
+
+        resourceLoader.setClassLoader(Thread.currentThread().getContextClassLoader());
+        return new PathMatchingResourcePatternResolver(resourceLoader);
+    }
+
+    private static Stream<Resource> getResources(ResourcePatternResolver patternResolver, String locationPattern)
+    {
+        try {
+            return Stream.of(patternResolver.getResources(locationPattern));
+        }
+        catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private List<Benchmark> loadBenchmarks(String sequenceId, ResourcePatternResolver patternResolver, List<Resource> benchmarkFiles)
     {
         return benchmarkFiles.stream()
-                .flatMap(file -> loadBenchmarks(sequenceId, file).stream())
+                .flatMap(file -> loadBenchmarks(sequenceId, patternResolver, file).stream())
                 .sorted((left, right) -> NaturalOrderComparator.forStrings().compare(left.getName(), right.getName()))
                 .collect(toList());
     }
 
-    private List<Benchmark> loadBenchmarks(String sequenceId, Path benchmarkFile)
+    private List<Benchmark> loadBenchmarks(String sequenceId, ResourcePatternResolver patternResolver, Resource benchmarkFile)
     {
         try {
-            String content = new String(readAllBytes(benchmarkFile), UTF_8);
+            Resource benchmarkDirResource = patternResolver.getResource(properties.getBenchmarksDir());
+
+            String content = asByteSource(benchmarkFile).asCharSource(UTF_8).read();
             Map<String, Object> yaml = loadYamlFromString(content);
 
             checkArgument(yaml.containsKey(DATA_SOURCE_KEY), "Mandatory variable %s not present in file %s", DATA_SOURCE_KEY, benchmarkFile);
@@ -174,7 +205,7 @@ public class BenchmarkLoader
 
             List<Benchmark> benchmarks = newArrayListWithCapacity(benchmarkDescriptors.size());
             for (BenchmarkDescriptor benchmarkDescriptor : benchmarkDescriptors) {
-                String benchmarkName = benchmarkName(benchmarkFile);
+                String benchmarkName = benchmarkName(benchmarkDirResource, benchmarkFile);
                 List<Query> queries = queryLoader.loadFromFiles(benchmarkDescriptor.getQueryNames());
 
                 Benchmark benchmark = new BenchmarkBuilder(benchmarkName, sequenceId, queries)
@@ -242,9 +273,11 @@ public class BenchmarkLoader
         }
     }
 
-    private String benchmarkName(Path benchmarkFile)
+    private String benchmarkName(Resource benchmarkDirResource, Resource benchmarkFile)
+            throws IOException
     {
-        String relativePath = properties.benchmarksFilesPath().relativize(benchmarkFile).toString();
+        String relativePath = benchmarkFile.getURL().toString()
+                .replaceFirst("^" + Pattern.quote(benchmarkDirResource.getURL().toString()) + "/?", "");
         return removeExtension(relativePath);
     }
 
@@ -272,23 +305,13 @@ public class BenchmarkLoader
         return variableMapList;
     }
 
-    private Predicate<Path> activeBenchmarks()
+    private List<String> activeBenchmarkPatterns()
     {
-        Optional<List<String>> activeBenchmarks = properties.getActiveBenchmarks();
-        if (activeBenchmarks.isPresent()) {
-            return benchmarkNameIn(activeBenchmarks.get());
-        }
-        return path -> true;
-    }
-
-    private Predicate<Path> benchmarkNameIn(List<String> activeBenchmarks)
-    {
-        List<String> names = ImmutableList.copyOf(activeBenchmarks);
-
-        return benchmarkFile -> {
-            String benchmarkName = benchmarkName(benchmarkFile);
-            return names.contains(benchmarkName);
-        };
+        return properties.getActiveBenchmarks()
+                .orElse(singletonList("**/*"))
+                .stream()
+                .map(name -> name + "." + BENCHMARK_FILE_SUFFIX)
+                .collect(toList());
     }
 
     private void fillUniqueBenchmarkNames(List<Benchmark> benchmarks)
@@ -352,5 +375,19 @@ public class BenchmarkLoader
         int dataSourceMaxLength = benchmarks.stream().mapToInt((benchmark) -> benchmark.getDataSource().length()).max().orElseGet(() -> 10);
         int indent = 3;
         return "\t| %-" + (nameMaxLength + indent) + "s | %-" + (dataSourceMaxLength + indent) + "s | %-4s | %-8s | %-11s |";
+    }
+
+    private static ByteSource asByteSource(Resource resource)
+    {
+        checkNotNull(resource);
+        return new ByteSource()
+        {
+            @Override
+            public InputStream openStream()
+                    throws IOException
+            {
+                return resource.getInputStream();
+            }
+        };
     }
 }

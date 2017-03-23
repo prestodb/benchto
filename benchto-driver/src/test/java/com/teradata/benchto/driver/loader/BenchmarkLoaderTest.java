@@ -31,12 +31,18 @@ import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
+import static com.google.common.base.Preconditions.checkState;
 import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toSet;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.data.MapEntry.entry;
 
@@ -67,7 +73,7 @@ public class BenchmarkLoaderTest
         ReflectionTestUtils.setField(loader, "benchmarkServiceClient", benchmarkServiceClient);
         ReflectionTestUtils.setField(loader, "freemarkerConfiguration", freemarkerConfiguration);
 
-        withBenchmarksDir("unit-benchmarks");
+        withBenchmarksDir("classpath:/unit-benchmarks");
         withFrequencyCheckEnabled(true);
     }
 
@@ -122,6 +128,56 @@ public class BenchmarkLoaderTest
     }
 
     @Test
+    public void shouldLoadAllBenchmarks()
+            throws IOException
+    {
+        // Given no withActiveBenchmarks(...)
+        // When
+        List<Benchmark> benchmarks = loader.loadBenchmarks("sequenceId");
+        // Then
+        Set<String> loadedNames = benchmarks.stream()
+                .map(Benchmark::getName)
+                .collect(toSet());
+
+        assertThat(loadedNames)
+                .contains("concurrent-benchmark", "simple-benchmark");
+    }
+
+    @Test
+    public void shouldLoadBenchmarksFromFileSystem()
+            throws Exception
+    {
+        String dir = new File(getClass().getResource("/unit-benchmarks/simple-benchmark.yaml").toURI()).getParentFile().getAbsolutePath();
+        checkBenchmarksLoading(dir);
+    }
+
+    @Test
+    public void shouldLoadBenchmarksFromFileSystemRelativePath()
+            throws Exception
+    {
+        Path dir = new File(getClass().getResource("/unit-benchmarks/simple-benchmark.yaml").toURI()).getParentFile().toPath();
+        Path benchmarksDir = Paths.get("").toAbsolutePath().relativize(dir.toAbsolutePath());
+        checkState(!benchmarksDir.isAbsolute());
+        checkBenchmarksLoading(benchmarksDir.toString());
+    }
+
+    private void checkBenchmarksLoading(String benchmarksDir)
+    {
+        withBenchmarksDir(benchmarksDir);
+
+        // When
+        List<Benchmark> benchmarks = loader.loadBenchmarks("sequenceId");
+
+        // Then
+        Set<String> loadedNames = benchmarks.stream()
+                .map(Benchmark::getName)
+                .collect(toSet());
+
+        assertThat(loadedNames)
+                .contains("concurrent-benchmark", "simple-benchmark");
+    }
+
+    @Test
     public void shouldLoadConcurrentBenchmark()
             throws IOException
     {
@@ -168,7 +224,7 @@ public class BenchmarkLoaderTest
         thrown.expect(BenchmarkExecutionException.class);
         thrown.expectMessage("Recursive value substitution is not supported, invalid a: ${b}");
 
-        withBenchmarksDir("unit-benchmarks-invalid");
+        withBenchmarksDir("classpath:unit-benchmarks-invalid");
         withActiveBenchmarks("cycle-variables-benchmark");
 
         loader.loadBenchmarks("sequenceId");

@@ -16,13 +16,11 @@ package com.teradata.benchto.driver;
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
-import com.google.common.primitives.Booleans;
 import com.teradata.benchto.driver.graphite.GraphiteProperties;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -31,17 +29,16 @@ import java.util.Optional;
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkState;
 import static com.teradata.benchto.driver.utils.PropertiesUtils.splitProperty;
-import static com.teradata.benchto.driver.utils.ResourceUtils.asPath;
 import static java.util.stream.Collectors.toMap;
 
 @Component
 public class BenchmarkProperties
 {
 
-    @Value("${sql:sql}")
+    @Value("${sql:#{'classpath:sql'}}")
     private String sqlDir;
 
-    @Value("${benchmarks:benchmarks}")
+    @Value("${benchmarks:#{'classpath:/benchmarks}}")
     private String benchmarksDir;
 
     /**
@@ -92,11 +89,6 @@ public class BenchmarkProperties
     public String getBenchmarksDir()
     {
         return benchmarksDir;
-    }
-
-    public Path benchmarksFilesPath()
-    {
-        return asPath(getBenchmarksDir());
     }
 
     public Optional<String> getExecutionSequenceId()

@@ -16,6 +16,8 @@ package com.teradata.benchto.driver.utils;
 import com.facebook.presto.jdbc.internal.guava.collect.ImmutableMap;
 import com.teradata.benchto.driver.BenchmarkExecutionException;
 import com.teradata.benchto.driver.loader.BenchmarkLoader;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.URI;
@@ -28,18 +30,21 @@ import java.nio.file.Paths;
 
 public final class ResourceUtils
 {
+    private static final Logger LOGGER = LoggerFactory.getLogger(ResourceUtils.class);
 
     public static Path asPath(String resourcePath)
     {
         URL resourceUrl = BenchmarkLoader.class.getClassLoader().getResource(resourcePath);
         if (resourceUrl != null) {
             try {
+                LOGGER.info("Using some classpath's jar for benchmark location");
                 return getPath(resourceUrl.toURI());
             }
             catch (URISyntaxException e) {
                 throw new BenchmarkExecutionException("Cant resolve URL", e);
             }
         }
+        LOGGER.info("Using file system location for benchmark location");
         return FileSystems.getDefault().getPath(resourcePath);
     }
 
