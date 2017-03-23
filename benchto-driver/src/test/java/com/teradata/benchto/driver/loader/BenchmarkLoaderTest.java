@@ -271,12 +271,13 @@ public class BenchmarkLoaderTest
         withActiveVariables("format=(rc)|(tx)");
 
         assertLoadedBenchmarksCount(4).forEach(benchmark ->
-                        assertThat(benchmark.getVariables().get("format")).isIn("orc", "txt")
+                assertThat(benchmark.getVariables().get("format")).isIn("orc", "txt")
         );
     }
 
     @Test
-    public void allBenchmarks_load_only_not_executed_within_two_days() {
+    public void allBenchmarks_load_only_not_executed_within_two_days()
+    {
         Duration executionAge = Duration.ofDays(2);
         withBenchmarkExecutionAge(executionAge);
         withFrequencyCheckEnabled(true);
@@ -291,7 +292,8 @@ public class BenchmarkLoaderTest
     }
 
     @Test
-    public void allBenchmarks_frequency_check_is_disabled() {
+    public void allBenchmarks_frequency_check_is_disabled()
+    {
         withBenchmarkExecutionAge(Duration.ofDays(2));
         withFrequencyCheckEnabled(false);
 
@@ -346,7 +348,8 @@ public class BenchmarkLoaderTest
         ReflectionTestUtils.setField(benchmarkProperties, "frequencyCheckEnabled", Boolean.toString(enabled));
     }
 
-    private void withBenchmarkExecutionAge(Duration executionAge) {
+    private void withBenchmarkExecutionAge(Duration executionAge)
+    {
         this.benchmarkExecutionAge = executionAge;
     }
 }
