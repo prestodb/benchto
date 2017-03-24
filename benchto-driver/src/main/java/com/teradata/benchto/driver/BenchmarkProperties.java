@@ -35,7 +35,7 @@ import static java.util.stream.Collectors.toMap;
 public class BenchmarkProperties
 {
 
-    @Value("${sql:sql}")
+    @Value("${sql:#{'classpath:/sql'}}")
     private String sqlDir;
 
     @Value("${benchmarks:#{'classpath:/benchmarks'}}")

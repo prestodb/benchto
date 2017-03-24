@@ -29,6 +29,7 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
+import org.springframework.core.io.ResourceLoader;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.io.File;
@@ -82,7 +83,7 @@ public class BenchmarkLoaderTest
         return new QueryLoader()
         {
             @Override
-            public Query loadFromFile(String queryName)
+            Query loadFromFile(ResourceLoader resourceLoader, String queryName)
             {
                 return new Query(queryName, "test query", ImmutableMap.of());
             }
