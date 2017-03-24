@@ -14,12 +14,15 @@
 package com.teradata.benchto.driver.utils;
 
 import com.facebook.presto.jdbc.internal.guava.collect.ImmutableMap;
+import com.google.common.io.ByteSource;
 import com.teradata.benchto.driver.BenchmarkExecutionException;
 import com.teradata.benchto.driver.loader.BenchmarkLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.io.Resource;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -27,6 +30,8 @@ import java.nio.file.FileSystemNotFoundException;
 import java.nio.file.FileSystems;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+
+import static com.facebook.presto.jdbc.internal.guava.base.Preconditions.checkNotNull;
 
 public final class ResourceUtils
 {
@@ -62,6 +67,20 @@ public final class ResourceUtils
                 throw new RuntimeException(ioException);
             }
         }
+    }
+
+    public static ByteSource asByteSource(Resource resource)
+    {
+        checkNotNull(resource);
+        return new ByteSource()
+        {
+            @Override
+            public InputStream openStream()
+                    throws IOException
+            {
+                return resource.getInputStream();
+            }
+        };
     }
 
     private ResourceUtils() {}
