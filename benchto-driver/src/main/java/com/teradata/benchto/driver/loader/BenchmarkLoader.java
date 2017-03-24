@@ -29,7 +29,6 @@ import freemarker.template.TemplateException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.io.FileSystemResourceLoader;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.core.io.support.ResourcePatternResolver;
@@ -159,23 +158,11 @@ public class BenchmarkLoader
         return benchmarkFiles;
     }
 
-    private ResourcePatternResolver getResourcePatternResolver()
+    private static ResourcePatternResolver getResourcePatternResolver()
     {
-        FileSystemResourceLoader resourceLoader = new FileSystemResourceLoader()
-        {
-            @Override
-            protected Resource getResourceByPath(String path)
-            {
-                if (path != null && path.startsWith("/")) {
-                    // Workaround superclass's stripping of leading '/'. Shameful.
-                    path = "/" + path;
-                }
-                return super.getResourceByPath(path);
-            }
-        };
-
-        resourceLoader.setClassLoader(Thread.currentThread().getContextClassLoader());
-        return new PathMatchingResourcePatternResolver(resourceLoader);
+        return new PathMatchingResourcePatternResolver(
+                new TrueFileSystemResourceLoader(Thread.currentThread().getContextClassLoader())
+        );
     }
 
     private List<Benchmark> loadBenchmarks(String sequenceId, Resource benchmarkDirResource, List<Resource> benchmarkFiles)
