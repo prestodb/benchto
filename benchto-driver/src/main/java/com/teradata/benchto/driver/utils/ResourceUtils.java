@@ -13,62 +13,16 @@
  */
 package com.teradata.benchto.driver.utils;
 
-import com.facebook.presto.jdbc.internal.guava.collect.ImmutableMap;
 import com.google.common.io.ByteSource;
-import com.teradata.benchto.driver.BenchmarkExecutionException;
-import com.teradata.benchto.driver.loader.BenchmarkLoader;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.core.io.Resource;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.URL;
-import java.nio.file.FileSystemNotFoundException;
-import java.nio.file.FileSystems;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 
 import static com.facebook.presto.jdbc.internal.guava.base.Preconditions.checkNotNull;
 
 public final class ResourceUtils
 {
-    private static final Logger LOGGER = LoggerFactory.getLogger(ResourceUtils.class);
-
-    public static Path asPath(String resourcePath)
-    {
-        URL resourceUrl = BenchmarkLoader.class.getClassLoader().getResource(resourcePath);
-        if (resourceUrl != null) {
-            try {
-                LOGGER.info("Using some classpath's jar for benchmark location");
-                return getPath(resourceUrl.toURI());
-            }
-            catch (URISyntaxException e) {
-                throw new BenchmarkExecutionException("Cant resolve URL", e);
-            }
-        }
-        LOGGER.info("Using file system location for benchmark location");
-        return FileSystems.getDefault().getPath(resourcePath);
-    }
-
-    private static Path getPath(URI uri)
-    {
-        try {
-            return Paths.get(uri);
-        }
-        catch (FileSystemNotFoundException e) {
-            try {
-                FileSystems.newFileSystem(uri, ImmutableMap.of());
-                return Paths.get(uri);
-            }
-            catch (IOException ioException) {
-                throw new RuntimeException(ioException);
-            }
-        }
-    }
-
     public static ByteSource asByteSource(Resource resource)
     {
         checkNotNull(resource);
