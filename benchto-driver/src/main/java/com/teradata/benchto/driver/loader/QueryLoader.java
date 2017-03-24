@@ -13,10 +13,13 @@
  */
 package com.teradata.benchto.driver.loader;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.teradata.benchto.driver.BenchmarkExecutionException;
 import com.teradata.benchto.driver.BenchmarkProperties;
 import com.teradata.benchto.driver.Query;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.ResourceLoader;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -24,8 +27,9 @@ import java.nio.file.Path;
 import java.util.List;
 
 import static com.google.common.io.Files.getNameWithoutExtension;
-import static com.teradata.benchto.driver.utils.ResourceUtils.asPath;
+import static com.teradata.benchto.driver.utils.ResourceUtils.asByteSource;
 import static java.lang.String.format;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.stream.Collectors.toList;
 
 @Component
@@ -45,26 +49,39 @@ public class QueryLoader
      */
     public Query loadFromFile(String queryName)
     {
-        Path queryPath = sqlFilesPath().resolve(queryName);
+        return loadFromFile(getResourceLoader(), queryName);
+    }
+
+    @VisibleForTesting
+    Query loadFromFile(ResourceLoader resourceLoader, String queryName)
+    {
         try {
-            String queryNameWithoutExtension = getNameWithoutExtension(queryPath.toString());
-            return annotatedQueryParser.parseFile(queryNameWithoutExtension, queryPath);
+            String fileContents = readQueryFile(resourceLoader, queryName);
+            String queryNameWithoutExtension = getNameWithoutExtension(queryName);
+            return annotatedQueryParser.parseQuery(queryNameWithoutExtension, fileContents);
         }
         catch (IOException e) {
-            throw new BenchmarkExecutionException(format("Error during loading query from path %s", queryPath), e);
+            throw new BenchmarkExecutionException(format("Error during loading query %s", queryName), e);
         }
+    }
+
+    private String readQueryFile(ResourceLoader resourceLoader, String queryName)
+            throws IOException
+    {
+        Resource resource = resourceLoader.getResource(properties.getSqlDir() + "/" + queryName);
+        return asByteSource(resource).asCharSource(UTF_8).read();
     }
 
     public List<Query> loadFromFiles(List<String> queryNames)
     {
-        return queryNames
-                .stream()
-                .map(this::loadFromFile)
+        ResourceLoader resourceLoader = getResourceLoader();
+        return queryNames.stream()
+                .map(queryName -> loadFromFile(resourceLoader, queryName))
                 .collect(toList());
     }
 
-    private Path sqlFilesPath()
+    private static ResourceLoader getResourceLoader()
     {
-        return asPath(properties.getSqlDir());
+        return new TrueFileSystemResourceLoader(Thread.currentThread().getContextClassLoader());
     }
 }

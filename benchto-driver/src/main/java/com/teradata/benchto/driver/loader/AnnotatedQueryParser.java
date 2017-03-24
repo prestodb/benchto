@@ -13,14 +13,13 @@
  */
 package com.teradata.benchto.driver.loader;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Splitter;
 import com.google.common.collect.MapDifference.ValueDifference;
 import com.teradata.benchto.driver.Query;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,7 +28,6 @@ import java.util.stream.Collectors;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.Maps.difference;
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.stream.Collectors.toList;
 
 /**
@@ -56,13 +54,14 @@ public class AnnotatedQueryParser
             .trimResults()
             .withKeyValueSeparator(Splitter.on(":").trimResults());
 
-    public Query parseFile(String queryName, Path inputFile)
+    public Query parseQuery(String queryName, String queryString)
             throws IOException
     {
-        return parseLines(queryName, Files.lines(inputFile, UTF_8).collect(toList()));
+        return parseLines(queryName, Splitter.on('\n').splitToList(queryString));
     }
 
-    public Query parseLines(String queryName, List<String> lines)
+    @VisibleForTesting
+    Query parseLines(String queryName, List<String> lines)
     {
         lines = lines.stream()
                 .map(line -> line.trim())
