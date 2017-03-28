@@ -47,9 +47,15 @@ public class QueryLoaderTest
     public void shouldLoadPrestoQuery()
             throws Exception
     {
-        Query query = queryLoader.loadFromFile("presto/simple_select.sql");
+        verifySimpleSelect("presto/simple_select.sql", "simple_select");
+        verifySimpleSelect("presto/second_simple_select.sql", "second_simple_select");
+    }
+
+    private void verifySimpleSelect(String path, String queryName)
+    {
+        Query query = queryLoader.loadFromFile(path);
         List<String> sqlStatements = sqlStatementGenerator.generateQuerySqlStatement(query, createAttributes("database", "schema"));
-        assertThat(query.getName()).isEqualTo("simple_select");
+        assertThat(query.getName()).isEqualTo(queryName);
         assertThat(sqlStatements).containsExactly("SELECT 1 FROM \"schema\".SYSTEM_USERS");
     }
 

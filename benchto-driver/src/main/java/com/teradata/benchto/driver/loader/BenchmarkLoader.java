@@ -164,12 +164,15 @@ public class BenchmarkLoader
     {
         LOGGER.info("Searching for benchmarks in classpath ...");
 
-        List<Path> benchmarkFiles = Files
-                .walk(properties.benchmarksFilesPath())
-                .filter(file -> isRegularFile(file) && file.toString().endsWith(BENCHMARK_FILE_SUFFIX))
-                .collect(toList());
-        benchmarkFiles.stream().forEach((path) -> LOGGER.info("Benchmark found: {}", path.toString()));
+        ImmutableList.Builder<Path> benchmarkFilesBuilder = ImmutableList.builder();
+        for (Path benchmarkFilesPath : properties.benchmarksFilesDirs()) {
+            Files.walk(benchmarkFilesPath)
+                    .filter(file -> isRegularFile(file) && file.toString().endsWith(BENCHMARK_FILE_SUFFIX))
+                    .forEach(benchmarkFilesBuilder::add);
+        }
 
+        List<Path> benchmarkFiles = benchmarkFilesBuilder.build();
+        benchmarkFiles.stream().forEach((path) -> LOGGER.info("Benchmark found: {}", path.toString()));
         return benchmarkFiles;
     }
 
@@ -280,7 +283,10 @@ public class BenchmarkLoader
 
     private String benchmarkName(Path benchmarkFile)
     {
-        String relativePath = properties.benchmarksFilesPath().relativize(benchmarkFile).toString();
+        Path benchmarkFilesDir = properties.benchmarksFilesDirs().stream()
+                .filter(benchmarkFile::startsWith)
+                .findFirst().get();
+        String relativePath = benchmarkFilesDir.relativize(benchmarkFile).toString();
         return removeExtension(relativePath);
     }
 

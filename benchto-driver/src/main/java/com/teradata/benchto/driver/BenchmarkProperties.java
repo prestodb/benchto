@@ -31,16 +31,18 @@ import java.util.Optional;
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkState;
 import static com.teradata.benchto.driver.utils.PropertiesUtils.splitProperty;
+import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
 
 @Component
 public class BenchmarkProperties
 {
     @Value("${sql}")
-    private String sqlDir;
+    private String sqlDirs;
 
     @Value("${benchmarks}")
-    private String benchmarksDir;
+    private String benchmarksDirs;
 
     @Value("${overrides:#{null}}")
     private String overridesPath;
@@ -84,19 +86,20 @@ public class BenchmarkProperties
     @Autowired
     private GraphiteProperties graphiteProperties;
 
-    public String getSqlDir()
+    public List<Path> sqlFilesDirs()
     {
-        return sqlDir;
+        return splitProperty(sqlDirs).map(dirs -> dirs.stream()
+                .map(Paths::get)
+                .collect(toList()))
+                .orElse(emptyList());
     }
 
-    public String getBenchmarksDir()
+    public List<Path> benchmarksFilesDirs()
     {
-        return benchmarksDir;
-    }
-
-    public Path benchmarksFilesPath()
-    {
-        return Paths.get(getBenchmarksDir());
+        return splitProperty(benchmarksDirs).map(dirs -> dirs.stream()
+                .map(Paths::get)
+                .collect(toList()))
+                .orElse(emptyList());
     }
 
     public Optional<Path> getOverridesPath()
@@ -149,8 +152,8 @@ public class BenchmarkProperties
     public String toString()
     {
         ToStringHelper toStringHelper = toStringHelper(this)
-                .add("sqlDir", sqlDir)
-                .add("benchmarksDir", benchmarksDir)
+                .add("sqlDirs", sqlDirs)
+                .add("benchmarksDirs", benchmarksDirs)
                 .add("executionSequenceId", executionSequenceId)
                 .add("environmentName", environmentName)
                 .add("graphiteProperties", graphiteProperties)
