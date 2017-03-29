@@ -40,6 +40,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -120,6 +121,8 @@ public class BenchmarkLoader
                     .filter(activeBenchmarks())
                     .collect(toList());
 
+            verifyNoDuplicateBenchmarks(benchmarkFiles);
+
             benchmarkFiles.stream()
                     .forEach(path -> LOGGER.info("Benchmark file to be read: {}", path));
 
@@ -164,6 +167,8 @@ public class BenchmarkLoader
     {
         LOGGER.info("Searching for benchmarks in classpath ...");
 
+        verifyNoNestedBenchmarkDirs();
+
         ImmutableList.Builder<Path> benchmarkFilesBuilder = ImmutableList.builder();
         for (Path benchmarkFilesPath : properties.benchmarksFilesDirs()) {
             Files.walk(benchmarkFilesPath)
@@ -172,8 +177,31 @@ public class BenchmarkLoader
         }
 
         List<Path> benchmarkFiles = benchmarkFilesBuilder.build();
-        benchmarkFiles.stream().forEach((path) -> LOGGER.info("Benchmark found: {}", path.toString()));
+        benchmarkFiles.stream().forEach(path -> LOGGER.info("Benchmark found: {}", path.toString()));
         return benchmarkFiles;
+    }
+
+    private void verifyNoNestedBenchmarkDirs()
+    {
+        boolean containsNestedBenchmarkDirs = properties.benchmarksFilesDirs().stream()
+                .filter(benchmarkFilesPath -> properties.benchmarksFilesDirs().stream()
+                        .filter(path -> !path.equals(benchmarkFilesPath) && path.startsWith(benchmarkFilesPath))
+                        .findAny().isPresent())
+                .findAny().isPresent();
+        if (containsNestedBenchmarkDirs) {
+            throw new BenchmarkExecutionException("Benchmark directories contain nested paths");
+        }
+    }
+
+    private void verifyNoDuplicateBenchmarks(List<Path> benchmarkFiles)
+    {
+        Set<String> benchmarkNames = new HashSet<>();
+        for (Path benchmarkFile : benchmarkFiles) {
+            String benchmarkName = benchmarkName(benchmarkFile);
+            if (!benchmarkNames.add(benchmarkName)) {
+                throw new BenchmarkExecutionException("Benchmark with name \"" + benchmarkName + "\" in multiple locations");
+            }
+        }
     }
 
     private List<Benchmark> loadBenchmarks(String sequenceId, List<Path> benchmarkFiles)

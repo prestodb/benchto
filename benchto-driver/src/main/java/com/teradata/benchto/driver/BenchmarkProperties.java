@@ -30,9 +30,8 @@ import java.util.Optional;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkState;
+import static com.teradata.benchto.driver.utils.PropertiesUtils.extractPaths;
 import static com.teradata.benchto.driver.utils.PropertiesUtils.splitProperty;
-import static java.util.Collections.emptyList;
-import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
 
 @Component
@@ -88,18 +87,12 @@ public class BenchmarkProperties
 
     public List<Path> sqlFilesDirs()
     {
-        return splitProperty(sqlDirs).map(dirs -> dirs.stream()
-                .map(Paths::get)
-                .collect(toList()))
-                .orElse(emptyList());
+        return extractPaths(sqlDirs);
     }
 
     public List<Path> benchmarksFilesDirs()
     {
-        return splitProperty(benchmarksDirs).map(dirs -> dirs.stream()
-                .map(Paths::get)
-                .collect(toList()))
-                .orElse(emptyList());
+        return extractPaths(benchmarksDirs);
     }
 
     public Optional<Path> getOverridesPath()

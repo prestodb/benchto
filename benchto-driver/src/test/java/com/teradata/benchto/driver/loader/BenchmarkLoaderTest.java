@@ -142,6 +142,35 @@ public class BenchmarkLoaderTest
     }
 
     @Test
+    public void shouldFailDuplicatedBenchmarkInMultiplePaths()
+            throws IOException
+    {
+        loader.setup();
+
+        thrown.expect(BenchmarkExecutionException.class);
+        thrown.expectMessage("Benchmark with name \"duplicate_benchmark\" in multiple locations");
+
+        withActiveBenchmarks("duplicate_benchmark");
+        withBenchmarksDirs("duplicate_benchmark_dir1", "duplicate_benchmark_dir2");
+
+        loader.loadBenchmarks("sequenceId");
+    }
+
+    @Test
+    public void shouldFailNestedBenchmarkDirs()
+            throws IOException
+    {
+        loader.setup();
+
+        thrown.expect(BenchmarkExecutionException.class);
+        thrown.expectMessage("Benchmark directories contain nested paths");
+
+        withBenchmarksDirs("benchmark_dir", "benchmark_dir/nested");
+
+        loader.loadBenchmarks("sequenceId");
+    }
+
+    @Test
     public void shouldLoadConcurrentBenchmark()
             throws IOException
     {
