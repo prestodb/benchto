@@ -41,6 +41,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.ui.freemarker.FreeMarkerConfigurationFactoryBean;
 import org.springframework.web.client.RestTemplate;
 
+import java.io.File;
 import java.io.IOException;
 
 import static com.google.common.base.Preconditions.checkState;
@@ -68,6 +69,13 @@ public class DriverApp
                 .properties();
         if (commandLine.hasOption("profile")) {
             applicationBuilder.profiles(commandLine.getOptionValue("profile"));
+        }
+        if (commandLine.hasOption("profiles.directory")) {
+            String profilesDirectory = commandLine.getOptionValue("profiles.directory");
+            if (!profilesDirectory.endsWith(File.pathSeparator)) {
+                profilesDirectory += File.pathSeparator;
+            }
+            applicationBuilder.properties("spring.config.location=" + profilesDirectory);
         }
 
         try (ConfigurableApplicationContext ctx = applicationBuilder.run()) {
@@ -116,6 +124,7 @@ public class DriverApp
         addOption(options, "executionSequenceId", "SEQUENCE_ID", "sequence id of benchmark execution", "generated");
         addOption(options, "timeLimit", "DURATION", "amount of time while benchmarks will be executed", "unlimited");
         addOption(options, "profile", "PROFILE", "configuration profile", "none");
+        addOption(options, "profiles.directory", "PROFILES_DIRECTORY", "configuration profiles directory", "none");
         addOption(options, "frequencyCheckEnabled", "boolean", "if set no fresh benchmark will be executed", "true");
         options.addOption("h", "help", false, "Display help message.");
         return options;
