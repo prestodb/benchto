@@ -46,6 +46,12 @@ public class BenchmarkProperties
     @Value("${presto.url}")
     private String prestoURL;
 
+    @Value("${presto.username:#{null}}")
+    private String prestoUsername;
+
+    @Value("${presto.password:#{null}}")
+    private String prestoPassword;
+
     @Value("${benchmark-service.url}")
     private String serviceUrl;
 
@@ -109,6 +115,16 @@ public class BenchmarkProperties
     public String getPrestoURL()
     {
         return prestoURL;
+    }
+
+    public Optional<String> getPrestoUsername()
+    {
+        return Optional.ofNullable(prestoUsername);
+    }
+
+    public Optional<String> getPrestoPassword()
+    {
+        return Optional.ofNullable(prestoPassword);
     }
 
     public Optional<Path> getOverridesPath()
