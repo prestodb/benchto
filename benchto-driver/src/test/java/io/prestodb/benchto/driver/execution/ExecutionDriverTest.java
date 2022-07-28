@@ -86,7 +86,7 @@ public class ExecutionDriverTest
                 .thenReturn(Optional.of(ImmutableList.of("health-check-macro")));
         when(benchmarkProperties.getExecutionSequenceId())
                 .thenReturn(Optional.of("sequence-id"));
-        when(benchmarkExecutionDriver.execute(any(Benchmark.class), anyInt(), anyInt()))
+        when(benchmarkExecutionDriver.execute(any(Benchmark.class), anyInt(), anyInt(), any()))
                 .thenReturn(successfulBenchmarkExecution());
         when(benchmarkProperties.getTimeLimit())
                 .thenReturn(Optional.empty());
@@ -117,7 +117,7 @@ public class ExecutionDriverTest
 
         driver.execute();
 
-        verify(benchmarkExecutionDriver).execute(any(Benchmark.class), anyInt(), anyInt());
+        verify(benchmarkExecutionDriver).execute(any(Benchmark.class), anyInt(), anyInt(), any());
         verifyNoMoreInteractions(benchmarkExecutionDriver);
     }
 
