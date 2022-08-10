@@ -18,6 +18,7 @@ import io.prestodb.benchto.driver.execution.BenchmarkExecutionResult;
 import io.prestodb.benchto.driver.execution.QueryExecution;
 import io.prestodb.benchto.driver.execution.QueryExecutionResult;
 
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 
@@ -50,6 +51,12 @@ public class DefaultBenchmarkExecutionListener
 
     @Override
     public Future<?> executionFinished(QueryExecutionResult execution)
+    {
+        return CompletableFuture.completedFuture("");
+    }
+
+    @Override
+    public Future<?> concurrencyTestExecutionFinished(List<QueryExecutionResult> executions)
     {
         return CompletableFuture.completedFuture("");
     }
