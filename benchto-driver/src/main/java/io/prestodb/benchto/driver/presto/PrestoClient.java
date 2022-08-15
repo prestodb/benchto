@@ -18,8 +18,12 @@ import com.google.common.collect.ImmutableMap;
 import io.prestodb.benchto.driver.BenchmarkProperties;
 import io.prestodb.benchto.driver.service.Measurement;
 import io.prestodb.benchto.driver.utils.UnitConverter;
+import org.apache.commons.codec.binary.Base64;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
@@ -31,6 +35,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 import javax.measure.unit.Unit;
 
 import java.net.URI;
+import java.nio.charset.Charset;
 import java.util.List;
 import java.util.Map;
 
@@ -73,7 +78,15 @@ public class PrestoClient
     private List<Measurement> loadMetrics(String queryId, Map<String, Unit> requiredStatistics)
     {
         URI uri = buildQueryInfoURI(queryId);
-        ResponseEntity<QueryInfoResponseItem> response = restTemplate.getForEntity(uri, QueryInfoResponseItem.class);
+        HttpHeaders headers = new HttpHeaders();
+        if (properties.getPrestoUsername().isPresent() && properties.getPrestoPassword().isPresent()) {
+            headers.set("X-Presto-User", properties.getPrestoUsername().get());
+            headers.set("Authorization", createHeadersForBasicHttpAuth(properties.getPrestoUsername().get(),
+                    properties.getPrestoPassword().get()));
+        }
+        HttpEntity<String> entity = new HttpEntity<>(headers);
+        ResponseEntity<QueryInfoResponseItem> response = restTemplate.exchange
+                (uri, HttpMethod.GET, entity, QueryInfoResponseItem.class);
 
         Map<String, Object> queryStats = response.getBody().getQueryStats();
         return queryStats.keySet()
@@ -81,6 +94,14 @@ public class PrestoClient
                 .filter(requiredStatistics::containsKey)
                 .map(name -> parseQueryStatistic(name, queryStats.get(name), requiredStatistics.get(name)))
                 .collect(toList());
+    }
+
+    String createHeadersForBasicHttpAuth(String username, String password)
+    {
+        String auth = username + ":" + password;
+        byte[] encodedAuth = Base64.encodeBase64(
+                auth.getBytes(Charset.forName("US-ASCII")));
+        return "Basic " + new String(encodedAuth);
     }
 
     private URI buildQueryInfoURI(String queryId)
