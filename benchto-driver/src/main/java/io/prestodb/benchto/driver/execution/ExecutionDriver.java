@@ -13,9 +13,12 @@
  */
 package io.prestodb.benchto.driver.execution;
 
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListeningExecutorService;
 import io.prestodb.benchto.driver.Benchmark;
 import io.prestodb.benchto.driver.BenchmarkProperties;
 import io.prestodb.benchto.driver.FailedBenchmarkExecutionException;
+import io.prestodb.benchto.driver.concurrent.ExecutorServiceFactory;
 import io.prestodb.benchto.driver.listeners.benchmark.BenchmarkStatusReporter;
 import io.prestodb.benchto.driver.loader.BenchmarkLoader;
 import io.prestodb.benchto.driver.macro.MacroService;
@@ -29,6 +32,7 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 
 import static com.google.common.collect.Lists.newArrayList;
@@ -57,6 +61,9 @@ public class ExecutionDriver
     private MacroService macroService;
 
     private final ZonedDateTime startTime = nowUtc();
+
+    @Autowired
+    private ExecutorServiceFactory executorServiceFactory;
 
     public void execute()
     {
@@ -117,17 +124,46 @@ public class ExecutionDriver
     {
         List<BenchmarkExecutionResult> benchmarkExecutionResults = newArrayList();
         int benchmarkOrdinalNumber = 1;
-        for (Benchmark benchmark : benchmarks) {
-            if (isTimeLimitEnded()) {
-                LOG.warn("Time limit for running benchmarks has run out");
-                break;
+        int totalCnt = 0;
+        int concur = benchmarks.get(0).getConcurrency();
+        if (concur > 1) {
+            while (totalCnt < benchmarks.size()) {
+                ListeningExecutorService benchmarkExecutorService = executorServiceFactory.create(concur);
+                List<Callable<List<BenchmarkExecutionResult>>> concurExecutionCallables = newArrayList();
+                try {
+                    for (int thread = totalCnt; thread < totalCnt + concur; thread++) {
+                        int finalThread = thread;
+                        concurExecutionCallables.add(() -> {
+                            LOG.info("Running throughput test:Ram: {} queries, {} runs", benchmarks.get(finalThread), finalThread);
+                            executeHealthCheck(benchmarks.get(finalThread));
+                            benchmarkExecutionResults.add(benchmarkExecutionDriver.execute(benchmarks.get(finalThread), finalThread, benchmarks.size(), getExecutionTimeLimit()));
+                            benchmarkStatusReporter.processCompletedFutures();
+                            return benchmarkExecutionResults;
+                        });
+                    }
+                    List<ListenableFuture<List<BenchmarkExecutionResult>>> executionFutures = (List) benchmarkExecutorService.invokeAll(concurExecutionCallables);
+                }
+                catch (InterruptedException | RuntimeException e) {
+                    LOG.error("Exception during execution of after-all queries: {}", e);
+                }
+                finally {
+                    benchmarkExecutorService.shutdown();
+                }
+                totalCnt = totalCnt + concur;
             }
-
-            executeHealthCheck(benchmark);
-            benchmarkExecutionResults.add(benchmarkExecutionDriver.execute(benchmark, benchmarkOrdinalNumber++, benchmarks.size(), getExecutionTimeLimit()));
-            benchmarkStatusReporter.processCompletedFutures();
         }
+        else {
+            for (Benchmark benchmark : benchmarks) {
+                if (isTimeLimitEnded()) {
+                    LOG.warn("Time limit for running benchmarks has run out");
+                    break;
+                }
 
+                executeHealthCheck(benchmark);
+                benchmarkExecutionResults.add(benchmarkExecutionDriver.execute(benchmark, benchmarkOrdinalNumber++, benchmarks.size(), getExecutionTimeLimit()));
+                benchmarkStatusReporter.processCompletedFutures();
+            }
+        }
         List<BenchmarkExecutionResult> failedBenchmarkResults = benchmarkExecutionResults.stream()
                 .filter(benchmarkExecutionResult -> !benchmarkExecutionResult.isSuccessful())
                 .collect(toList());
